@@ -1,0 +1,51 @@
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/cppFiles/file.h to edit this template
+ */
+
+/* 
+ * File:   BattleshipStructs.h
+ * Author: ptron
+ *
+ * Created on October 29, 2022, 7:42 PM
+ */
+#ifndef BATTLESHIPSTRUCTS_H
+#define BATTLESHIPSTRUCTS_H
+struct binXfer {
+    char *ltr;
+    char *num;
+};
+struct BrdSet {
+    const static int sz=9;
+    std::string B1S[sz][sz];
+    std::string B1G[sz][sz];
+    std::string B2S[sz][sz];
+    std::string B2G[sz][sz];
+    std::string MB[sz][sz];
+};
+struct shipDat {
+    std::string *spcs;
+    int size;
+    short dmg;
+};
+struct plyrSave {
+    std::string P1Name, P2Name;
+    shipDat *P1Ships;
+    shipDat *P2Ships;
+    short P1Pts,P2Pts;
+    short turn, tMax;
+    short ShpDZ;
+    BrdSet BrdDat;
+};
+struct record
+            {
+        std::string Name; //player name
+        int Vs; //W or L for winner/loser
+        int Ps=0; //points accumulated
+        int Ts; //turns
+        int Gs; //games
+            };
+
+
+#endif /* BATTLESHIPSTRUCTS_H */
+
