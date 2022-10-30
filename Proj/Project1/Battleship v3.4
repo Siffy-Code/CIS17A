@@ -1,0 +1,1166 @@
+/* 
+ * File:   main.cpp
+ * Author: Peter T Ronning
+ * Created: 20220530 1454 PST
+ * Last Modified: 20220604
+ * Purpose:  To play a prompted game of battle ship against a human opponent
+ *Variables should include Name, units, range of entry, and details
+ */
+
+//System Level Libraries
+#include <iostream>  //Input-Output Library
+#include <iomanip> //for using setprecision(_)<<fixed for decimals - 
+                   //via google 20220218 1718 PST
+                   //verified 0 memory usage to add #include lines 20220223
+#include <string>  //added 20220223 1101 PST from CIS-5 Lecture 2 24:37
+                   //allows use of string variables; Ex. use to update outputs
+                   //with new names
+#include <cstdlib> //Added 20220223 1251 PST from CIS-5 Lab 2 9:49
+                   //allows use of "random" functions 
+                   //|srand(static_cast<int>(time(0)));|
+#include <ctime>   //Added 20220223 1251 PST from CIS-5 Lab 2 9:50
+                   //Time to set random number to; successive runs will produce
+                   //successive results
+#include <cmath>   //Added 20220310 1908 PST for exponents with variables
+                   //ex, pow(function,exponent)
+#include <sstream> //Added 20220501 1746 PST for stringstream to convert text
+                   //to numbers
+#include <fstream> //Added 20220513 1200 PST for file input/output
+#include <vector>  //Added 20220604 for Scores
+using namespace std;
+
+//User Defined Structure - Required for Function, Must be Global
+
+struct BrdSet {
+    const static int sz=9;
+    string B1S[sz][sz];
+    string B1G[sz][sz];
+    string B2S[sz][sz];
+    string B2G[sz][sz];
+    string MB[sz][sz];
+};
+
+struct shipDat {
+    string *spcs;
+    int size;
+    string *dmg;
+};
+struct plyrSave {
+    string P1Name, P2Name;
+    shipDat *P1Ships;
+    shipDat *P2Ships;
+    short P1Pts,P2Pts;
+    short turn,ShpDZ;
+    BrdSet BrdDat;
+};
+struct record
+            {
+        string Name; //player name
+        int Vs; //W or L for winner/loser
+        int Ps=0; //points accumulated
+        int Ts; //turns
+        int Gs; //games
+            };
+//Global Constants from Science/Engineering/Mathematics
+
+//Function Prototypes
+
+void shptxt (int );
+void saveG (plyrSave,fstream);
+void updscre (string ,string ,int ,int ,int,vector<record> &);
+record *newscre (string,string,int,int);
+void IPVal (string &);                                      //Verifies input to be within board range
+void IPVal (short &);                                       //Verifies input to be within board range (for grading purposes)
+void FillShp (string *,int,string);                        //fills ships with nested data validation to ensure no ships go off the board
+bool Clip2 (string *,int,string*,int,string &);           //array comparison tool
+void ICoord (string *,int);                                //outputs individual ship coordinates
+void UpdSBrd (string *,int,string [][9],int,string [][9]); //updates ship boards
+void UpdGBrd (string,string[][9],int,string [][9],bool);    //updates guess boards
+void MBdFill (string [][9],int);                            //fills master board
+void DisBrd (string [][9],int);                             //displays a board
+void BBdFill (string [][9],int);                            //fills boards initially with tildes (waves!)
+void Shoot (string ,string [][9],int ,string [][9],string [][9],short &); //Allows player to make a gridsquare guess 
+void DisScre(vector<record> &);                             //Displays Scores
+string Cnvt (char);                                         //Converts a char to a string (for grading purposes)
+bool Clip3 (shipDat *,short,string);
+//Development Concepts
+//|Current Board Display for P1, P2, or both|,
+//|different ship sizes|, |repeat guess detection|, |max turns|
+//|file output high scores, turns, etc|, |board size|, |accuracy score|
+//|multiplayer mode|, |limit AI guesses by own spaces|
+//|number of guesses based on ships in play|
+//Execution begins here!
+int main(int argc, char** argv) {
+    //Initialize Random Seed once here!
+    srand(static_cast<int>(time(0)));
+    
+    //Declare Variables
+    
+        //Score Variables
+            fstream file;
+                     //File I/O variables (internal) for file input and output.  Verify necessity of both in Project 2
+            vector<record> Scrs; //final scorecard version
+        //Core Variables
+            char    Menu; //User Menu Select Option, Valid options are N, S, R, X.  Other values simply register no change.
+            string   
+                    Win; //Names for players for game prompts, AI selection, and win detection.  Names entered as getline.
+            string  guess, 
+                    ValBuff; //guess: allows copy/paste of code for valid results per player
+            short       //game length variable, size irrelevant game will end if all points earned
+                    WinPts,
+                    LosePts;
+        //AI Variables
+            char    AIL; //AI Letter Selection for setup/guess components - used with srand and should be within defined boundaries of board (ex. [A,I])
+            int     AIN; //AI Number selection for setup/guess components - used with srand and should be within defined boundaries of board (ex. [1,9])
+        //Ship Arrays
+            const static int    Z2=2, 
+                                Z3=3, 
+                                Z4=4, 
+                                Z5=5, 
+                                Z9=9; //sizes for arrays, static variablesLine
+            short u=1;
+
+            plyrSave gamDat;
+
+            gamDat.ShpDZ = 5; //Number of ships per player
+            gamDat.P2Ships = new shipDat[gamDat.ShpDZ];
+
+            gamDat.P1Ships = new shipDat[gamDat.ShpDZ];
+            
+            gamDat.P1Ships[0].size = Z2;
+            gamDat.P1Ships[1].size = Z3;
+            gamDat.P1Ships[2].size = Z3;
+            gamDat.P1Ships[3].size = Z4;
+            gamDat.P1Ships[4].size = Z5;
+
+            gamDat.P2Ships[0].size = Z2;
+            gamDat.P2Ships[1].size = Z3;
+            gamDat.P2Ships[2].size = Z3;
+
+            gamDat.P2Ships[3].size = Z4;
+            gamDat.P2Ships[4].size = Z5;
+
+            for(int s=0;s<gamDat.ShpDZ;s++)
+            {
+            gamDat.P1Ships[s].spcs = new string [gamDat.P1Ships[s].size];
+            }
+
+            for(int s=0;s<gamDat.ShpDZ;s++)
+            {
+            gamDat.P2Ships[s].spcs = new string [gamDat.P2Ships[s].size];
+            }
+            
+
+            gamDat.P2Ships = new shipDat[Z5];
+            
+
+            
+            
+            
+
+            MBdFill(gamDat.BrdDat.MB,Z9);
+            BBdFill(gamDat.BrdDat.B1S,Z9);
+            BBdFill(gamDat.BrdDat.B2S,Z9);
+            BBdFill(gamDat.BrdDat.B1G,Z9);
+            BBdFill(gamDat.BrdDat.B1G,Z9);
+
+    //Initialize Boards
+    
+    //Welcome Screen
+    cout<<"Welcome to Battleship!"<<endl;
+    cout<<"Play against an opponent for 10 rounds"<<endl;
+    cout<<"Highest Score wins!"<<endl;
+    //Menu Select
+    while (Menu!='N') //Ensures selections S and R return to the menu once completed
+    {
+    cout<<"Please select from the following options:"<<endl;
+    cout<<"N: Start New Game"<<endl;
+    cout<<"S: Check Scores"<<endl;
+    cout<<"R: Reset Scores"<<endl;
+    cout<<"A: Sort Scores Alphabetically"<<endl;
+    cout<<"H: Sort Scores by High Score"<<endl;
+    cout<<"F: Search Scores by Name"<<endl;
+    cout<<"X: Exit"<<endl;
+    cin>>Menu;
+    cout<<endl;
+    cout<<endl;
+    switch (Menu)
+    { //Start Switch (Menu) Box
+        case 'N': cout<<endl;
+                  cout<<endl;break; //Passes through
+        case 'S': //High Score Display
+                file.open("Test1.txt", ios::in);  //reads a txt to a vector
+                while(!file.eof())
+                {
+                    record Plyr;
+                    if(file >> Plyr.Name >> Plyr.Vs >> Plyr.Ps >> Plyr.Ts >> Plyr.Gs)
+                    {Scrs.push_back(Plyr);}
+                    else{
+                        file.clear();
+                        file.ignore(100,'\n');
+                    }
+                }
+                file.close();
+                DisScre(Scrs);
+                cout<<endl;
+                cout<<endl;
+                break;
+        case 'R': //Reset Score
+                Scrs={};
+                file.open("Test1.txt",ios::out);  //puts a vector in a txt
+                for(int k=0;k<Scrs.size();k++)
+                {
+               file << Scrs[k].Name<<"\t"<<Scrs[k].Vs<<"\t"<<Scrs[k].Ps<<"\t"<<Scrs[k].Ts<<"\t"<<Scrs[k].Gs<<"\n";
+                }
+                file.close();
+                file.open("Test1.txt", ios::in);  //reads a txt to a vector
+                while(!file.eof())
+                {
+                    record Plyr;
+                    if(file >> Plyr.Name >> Plyr.Vs >> Plyr.Ps >> Plyr.Ts >> Plyr.Gs)
+                    {Scrs.push_back(Plyr);}
+                    else{
+                        file.clear();
+                        file.ignore(100,'\n');
+                    }
+                }
+                file.close();
+                cout<<endl;
+                cout<<endl;
+                break;
+        case 'X': exit(0); break;
+        case 'A':{ //Sort Scores Alphabetically (Selection Sort)
+                    Scrs={};
+                    file.open("Test1.txt", ios::in);  //reads a txt to a vector
+                        while(!file.eof())
+                        {
+                            record Plyr;
+                            if(file >> Plyr.Name >> Plyr.Vs >> Plyr.Ps >> Plyr.Ts >> Plyr.Gs)
+                            {Scrs.push_back(Plyr);}
+                            else{
+                                file.clear();
+                                file.ignore(100,'\n');
+                                }
+                        }
+                    file.close();
+                    record BF;
+             
+                    for(int i=0 ; i<Scrs.size() ; i++)
+                    {
+                        for(int n=i+1 ; n<Scrs.size() ; n++)
+                        {
+                            if(Scrs[i].Name>Scrs[n].Name)
+                            {
+                                BF=Scrs[i];
+                                Scrs[i]=Scrs[n];
+                                Scrs[n]=BF;
+                                BF={};
+                            }
+                        }
+                    }
+                    cout<<endl;
+                    cout<<endl;
+                    file.open("Test1.txt",ios::out);  //puts a vector in a txt
+                    for(int k=0;k<Scrs.size();k++)
+                        {
+                        file << Scrs[k].Name<<"\t"<<Scrs[k].Vs<<"\t"<<Scrs[k].Ps<<"\t"<<Scrs[k].Ts<<"\t"<<Scrs[k].Gs<<"\n";
+                        }
+                    file.close();
+                    Scrs={};       
+                    break;
+                    }
+            case 'H': {//Sort Scores by High Score (Bubble Sort)
+                    Scrs={};
+                    file.open("Test1.txt", ios::in);  //reads a txt to a vector
+                        while(!file.eof())
+                        {
+                            record Plyr;
+                            if(file >> Plyr.Name >> Plyr.Vs >> Plyr.Ps >> Plyr.Ts >> Plyr.Gs)
+                            {Scrs.push_back(Plyr);}
+                            else{
+                                file.clear();
+                                file.ignore(100,'\n');
+                                }
+                        }
+                        file.close();
+                    record BBF;
+                    for(int i=0 ; i<Scrs.size()-1 ; i++)
+                    {
+                        for(int n=0 ; n<Scrs.size()-i-1 ; n++)
+                        {
+                            if(Scrs[n].Ps<Scrs[n+1].Ps)
+                            {
+                                BBF=Scrs[n];
+                                Scrs[n]=Scrs[n+1];
+                                Scrs[n+1]=BBF;
+                                BBF={};
+                            }
+                        }
+                    }
+                    cout<<endl;
+                    cout<<endl;
+                    file.open("Test1.txt",ios::out);  //puts a vector in a txt
+                    for(int k=0;k<Scrs.size();k++)
+                        {
+                        file << Scrs[k].Name<<"\t"<<Scrs[k].Vs<<"\t"<<Scrs[k].Ps<<"\t"<<Scrs[k].Ts<<"\t"<<Scrs[k].Gs<<"\n";
+                        }
+                    file.close();
+                    Scrs={};       
+                    break;
+                    }       
+            case 'F': {//Search Scores using Linear Search
+                string Srch;
+                cout<<"Please type the desired name"<<endl;
+                cin>>Srch;
+                Scrs={};
+                file.open("Test1.txt", ios::in);  //reads a txt to a vector
+                        while(!file.eof())
+                        {
+                            record Plyr;
+                            if(file >> Plyr.Name >> Plyr.Vs >> Plyr.Ps >> Plyr.Ts >> Plyr.Gs)
+                            {Scrs.push_back(Plyr);}
+                            else{
+                                file.clear();
+                                file.ignore(100,'\n');
+                                }
+                        }
+                    file.close();
+                           
+                    
+                    for(int h=0;h<Scrs.size();h++)
+                    {
+                        if (Scrs[h].Name==Srch)
+                        {
+                        cout<<"Name"<<"\t"<<"W/L"<<"\t"<<"Pts"<<"\t"<<"Turns"<<endl;
+                        cout<<Scrs[h].Name<<"\t"<<Scrs[h].Vs<<"\t"<<Scrs[h].Ps<<"\t"<<Scrs[h].Ts<<"\t"<<Scrs[h].Gs<<endl;
+                        }
+                    }
+                    cout<<endl;
+                    cout<<endl;
+                    file.open("Test1.txt",ios::out);  //puts a vector in a txt
+                    for(int k=0;k<Scrs.size();k++)
+                        {
+                        file << Scrs[k].Name<<"\t"<<Scrs[k].Vs<<"\t"<<Scrs[k].Ps<<"\t"<<Scrs[k].Ts<<"\t"<<Scrs[k].Gs<<"\n";
+                        }
+                    file.close();
+                    Scrs={};       
+                    break;
+                    }
+    } //End Switch (Menu) Box
+    } //end Menu While Loop
+    
+    cin.ignore(); //reset input to allow player name in getline
+    
+    //Player Set-Up
+    
+    cout<<"Type a name for Player 1"<<endl;
+    cout<<"Use the name 'Skip' to enter debug mode"<<endl;
+    getline (cin,gamDat.P1Name); 
+    
+    cout<<"Type a name for Player 2"<<endl;
+    cout<<"To play against the computer, type AI"<<endl;
+    getline (cin,gamDat.P2Name);
+ 
+    cout<<endl;
+            
+    if (gamDat.P2Name!="AI") //Bypassed by AI player
+    {
+    cout<<"********************************************************"<<endl;
+    cout<<"********************************************************"<<endl;
+    cout<<"*****Tell "<<gamDat.P2Name<<" to look away!****"<<endl;
+    cout<<"********************************************************"<<endl;
+    cout<<"********************************************************"<<endl;
+    }
+    if (gamDat.P1Name!="Skip")
+    {
+        
+    for(int a=0;a<gamDat.ShpDZ;a++)
+    {
+    cout<<"Let's set up your ships, "<<gamDat.P1Name<<"!"<<endl;
+    cout<<endl;
+    cout<<endl;
+    DisBrd(gamDat.BrdDat.B1S,Z9);  
+    cout<<"-=Ship "<<(a+1)<<" of "<<gamDat.ShpDZ+1<<"=-"<<endl;
+    cout<<"Input a Grid Square to initialize Ship Placement"<<endl;
+    shptxt(a);
+    cout<<"Use one Capital Letter from A-I followed by one Number 1-9"<<endl;
+    cout<<"(Examples: A1, B6, I8, G9)"<<endl;
+    cin>>ValBuff;
+    IPVal (ValBuff); //Validation Function to Loop Player Input until within [A1,I9]
+    gamDat.P1Ships[a].spcs[0]=ValBuff; //Set initial value of Array to Player Input
+    ValBuff="0";
+    
+    for(int b=1;b<=a;b++)
+    {
+    if (Clip2(gamDat.P1Ships[a-1].spcs,gamDat.P1Ships[a-1].size,gamDat.P1Ships[a].spcs,gamDat.P1Ships[a].size,ValBuff)) //Display Error Text & Clear Buffer if invalid
+        {
+        cout<<"Invalid Selection - Ships Cannot Overlap"<<endl;
+        cout<<"Overlapping Ship Coordinates"<<endl;
+        cout<<ValBuff<<endl;
+        cout<<"Please Re-Initialize Ship"<<endl;
+        cout<<"Use one Capital Letter from A-I followed by one Number 1-9"<<endl;
+        ValBuff="0";
+        }
+    }   while (Clip2(gamDat.P1Ships[a-1].spcs,gamDat.P1Ships[a-1].size,gamDat.P1Ships[a].spcs,gamDat.P1Ships[a].size,ValBuff)); //Loop back to ship input unless ship locations are unique
+    
+    
+    
+    cout<<"Set up direction starting at: "<<gamDat.P1Ships[a].spcs[0]<<endl;
+    shptxt(a);
+    cout<<"Type |L| for Left, |R| for Right, |U| for Up, and |D| for down"<<endl;
+    cin>>ValBuff;
+    FillShp(gamDat.P1Ships[a].spcs,Z2,ValBuff); //Sends player to Fill Ship function, data validation nested
+    
+    cout<<"Your Ship's Coordinates Are:"<<endl;
+    ICoord(gamDat.P1Ships[a].spcs,Z2); //Outputs individual ship coordinates
+    UpdSBrd(gamDat.P1Ships[a].spcs,Z2,gamDat.BrdDat.B1S,Z9,gamDat.BrdDat.MB);
+    DisBrd(gamDat.BrdDat.B1S,Z9);   
+    
+    }
+    //End Player 1 Setup
+    }
+
+    if (gamDat.P2Name!="AI") //Bypassed by AI player
+    {
+    cout<<"********************************************************"<<endl;
+    cout<<"********************************************************"<<endl;
+    cout<<"*****Tell "<<gamDat.P1Name<<" to look away!****"<<endl;
+    cout<<"********************************************************"<<endl;
+    cout<<"********************************************************"<<endl;    
+        
+    cout<<"Let's set up your ships, "<<gamDat.P2Name<<"!"<<endl;
+    cout<<endl;
+    cout<<endl;
+    DisBrd(gamDat.BrdDat.B2S,Z9);  
+    
+    
+    
+    
+    
+    
+    //End Player 2 Setup
+    }//End AI Bypass for Player 2 Setup,
+    
+    //Begin AI Player Setup
+    else //Player 2 name = AI
+    {
+        while 
+           (Clip3(gamDat.P2Ships,gamDat.ShpDZ,ValBuff)) //forces assignment to repeat until all values are not player values
+        {
+            
+        BBdFill(gamDat.BrdDat.B2S,Z9);    
+        //Start AI While Loop
+        //AI Ship Setup
+        int q=0;
+        
+        AIL=(rand()%9+1+64); //set random Char for column guess A-I A=65?
+        AIN=(rand()%9+1);   //set random Number for Row guess 1-9    
+        gamDat.P2Ships[q].spcs[0]=(Cnvt(AIL))+to_string(AIN); //combine Column/Row for input
+        if(AIN<2 || AIN>8)//Criteria for Selecting Ship Orientation
+        {
+            Cnvt(AIL)<"B"?ValBuff="R":ValBuff="L";//Conditional Operator for Grading Purposes
+        }
+        else 
+        {
+            if (rand()%2<1) {ValBuff="U";} //Criteria for Selecting Ship Orientation
+            else {ValBuff="D";}
+        }
+        FillShp(gamDat.P2Ships[q].spcs,gamDat.P2Ships[q].size,ValBuff);
+        UpdSBrd(gamDat.P2Ships[q].spcs,gamDat.P2Ships[q].size,gamDat.BrdDat.B2S,Z9,gamDat.BrdDat.MB);
+        AIL=0; AIN=0; //Reset Buffers for next ship
+        q++;
+        
+        AIL=(rand()%9+1+64); //set random Char for column guess A-I A=65?
+        AIN=(rand()%9+1);   //set random Number for Row guess 1-9    
+        gamDat.P2Ships[q].spcs[0]=(Cnvt(AIL))+to_string(AIN); //combine Column/Row for input
+        if(AIN<3 || AIN>7)//Criteria for Selecting Ship Orientation
+        {
+            if(Cnvt(AIL)>"G"){ValBuff="L";}//Criteria for Selecting Ship Orientation
+            else {ValBuff="R";}
+        }
+        else 
+        {
+            if (rand()%2<1) {ValBuff="D";} //Criteria for Selecting Ship Orientation
+            else {ValBuff="U";}
+        }
+        FillShp(gamDat.P2Ships[q].spcs,gamDat.P2Ships[q].size,ValBuff);
+        UpdSBrd(gamDat.P2Ships[q].spcs,gamDat.P2Ships[q].size,gamDat.BrdDat.B2S,Z9,gamDat.BrdDat.MB);
+        //cout<<P2S2<<endl;
+        
+        AIL=0; AIN=0; //Reset Buffers for next ship
+                q++;
+
+        AIL=(rand()%9+1+64); //set random Char for column guess A-I A=65?
+        AIN=(rand()%9+1);   //set random Number for Row guess 1-9    
+        gamDat.P2Ships[q].spcs[0]=(Cnvt(AIL))+to_string(AIN); //combine Column/Row for input
+        if(AIN<3 || AIN>7) //Criteria for Selecting Ship Orientation
+        {
+            if(Cnvt(AIL)>"G"){ValBuff="L";}//Criteria for Selecting Ship Orientation
+            else {ValBuff="R";}
+        }
+        else 
+        {
+            if (rand()%2<1) {ValBuff="D";} //Criteria for Selecting Ship Orientation
+            else {ValBuff="U";}
+        }
+        FillShp(gamDat.P2Ships[q].spcs,gamDat.P2Ships[q].size,ValBuff);
+        UpdSBrd(gamDat.P2Ships[q].spcs,gamDat.P2Ships[q].size,gamDat.BrdDat.B2S,Z9,gamDat.BrdDat.MB);
+        //cout<<P2S3<<endl;
+        
+        AIL=0; AIN=0; //Reset Buffers for next ship
+                q++;
+
+        AIL=(rand()%9+1+64); //set random Char for column guess A-I A=65?
+        AIN=(rand()%9+1);   //set random Number for Row guess 1-9    
+        gamDat.P2Ships[q].spcs[0]=(Cnvt(AIL))+to_string(AIN); //combine Column/Row for input
+        if(AIN<4 || AIN>6)//Criteria for Selecting Ship Orientation
+        {
+            if(Cnvt(AIL)>"F"){ValBuff="L";}//Criteria for Selecting Ship Orientation
+            else {ValBuff="R";}
+        }
+        else 
+        {
+            if (rand()%2<1) {ValBuff="D";} //Criteria for Selecting Ship Orientation
+            else {ValBuff="U";}
+        }
+        FillShp(gamDat.P2Ships[q].spcs,gamDat.P2Ships[q].size,ValBuff);
+        UpdSBrd(gamDat.P2Ships[q].spcs,gamDat.P2Ships[q].size,gamDat.BrdDat.B2S,Z9,gamDat.BrdDat.MB);
+        //cout<<P2S4<<endl;
+        
+        AIL=0; AIN=0; //Reset Buffers for next ship
+                q++;
+
+        AIL=(rand()%9+1+64); //set random Char for column guess A-I A=65?
+        AIN=(rand()%9+1);   //set random Number for Row guess 1-9    
+        gamDat.P2Ships[q].spcs[0]=(Cnvt(AIL))+to_string(AIN); //combine Column/Row for input
+        if(AIN!=5)//Criteria for Selecting Ship Orientation
+        {
+            if(Cnvt(AIL)>"E"){ValBuff="L";}//Criteria for Selecting Ship Orientation
+            else {ValBuff="R";}
+        }
+        else 
+        {
+            if (rand()%2<1) {ValBuff="U";} //Criteria for Selecting Ship Orientation
+            else {ValBuff="D";}
+        }
+        FillShp(gamDat.P2Ships[q].spcs,gamDat.P2Ships[q].size,ValBuff);
+        UpdSBrd(gamDat.P2Ships[q].spcs,gamDat.P2Ships[q].size,gamDat.BrdDat.B2S,Z9,gamDat.BrdDat.MB);
+        //cout<<P2S5<<endl;
+        
+        if(gamDat.P1Name=="Skip")
+        {
+        cout<<"AI Ship Setup Has Run"<<endl;        //DEBUG LINE
+        }
+        q=0;
+        }//End AI While Loop
+        
+        
+        if(gamDat.P1Name=="Skip")
+            {
+            DisBrd(gamDat.BrdDat.B2S,Z9);
+            for(int q=0;q<gamDat.ShpDZ;q++){ICoord(gamDat.P2Ships[q].spcs,gamDat.P2Ships[q].size);}
+            }
+    }
+    //End AI Player Setup
+    
+    
+    
+    
+    
+    
+    //---------------------------------------------------------------------
+    //Transition to Gameplay
+    cout<<"- - - - - - - - - - - - - - - - - - - - - - - -"<<endl;
+    cout<<"- All ships were set up correctly.  Commence! -"<<endl;
+    cout<<"- - - - - - - - - - - - - - - - - - - - - - - -"<<endl;
+    cout<<endl;
+    cout<<"Ready, Steady, Go!"<<endl;
+    //End Transition to Gameplay
+  
+    gamDat.turn=0; //Ensure length starts at 0
+    cout<<"Input number of Turns to play"<<endl;
+    cout<<"Game will End after final turn or when all Ships are Destroyed!"<<endl;
+    cin>>gamDat.turn; //player inputs turns for game
+    IPVal(gamDat.turn); //Overloaded Function Example - validates less guesses than board size
+    cin.ignore();
+    //Begin Gameplay While Loop
+    Win="null"; //Force loop to run
+    gamDat.P1Pts=0;
+    gamDat.P2Pts=0;
+    while (Win=="null") //Run forced while loop until winner is declared
+    {    
+    //Begin Turn Loop, Adjust turns below this line   
+    for (int Turn=1; Turn<=gamDat.turn; Turn++)
+    {
+        
+    //Begin New Turn Transition Text
+    cout<<"_______________________________________________"<<endl;
+    cout<<"Turn #"<<Turn<<endl;
+    cout<<"_______________________________________________"<<endl;
+    cout<<gamDat.P1Name<<"'s turn!"<<endl;
+    //End New Turn Transition Text
+    
+    //Begin Player 1 Turn
+    guess="0"; //Reset guess value
+    cout<<endl;
+    cout<<"Here is your Guess Board, "<<gamDat.P1Name<<"!"<<endl;
+    cout<<endl;
+    cout<<endl;
+    DisBrd(gamDat.BrdDat.B1G,Z9);
+    cout<<"You have "<<gamDat.P1Pts<<" Points"<<endl;
+    cout<<endl;
+    cout<<endl;
+    cout<<gamDat.P1Name<<"; choose a Grid Square!"<<endl;
+    cin>>ValBuff; //Receive player input into Buffer, do not declare guess until validated
+    
+    //Begin Player 1 Input Validation Function
+    IPVal (ValBuff); //Validation Function to Loop Player Input until within [A1,I9]
+    guess=ValBuff; //Release Validation buffer to guess 
+    ValBuff="0";
+    //End Player 1 Input Validation Function
+    
+    //Player 1 now has a valid guess
+    Shoot(guess,gamDat.BrdDat.B2S,Z9,gamDat.BrdDat.MB,gamDat.BrdDat.B1G,gamDat.P1Pts);
+    cout<<endl;
+    cout<<endl;
+    //Begin Endgame Check 
+    if(gamDat.P1Pts>=17) //Are all Player 2 Ships off the board?
+    {Win=gamDat.P1Name; Turn=gamDat.turn;} //Set turns to max here to ensure game ends correctly, Declare Winner
+    //End Endgame Check
+    
+    //End Player 1 Turn
+    
+    else //Endgame Check Fails, Run Player 2 Turn
+    {
+    
+    if (gamDat.P2Name!="AI")    
+    { //Begin Bypass Player 2 input by AI   
+    cout<<"________________"<<endl;    
+    cout<<gamDat.P2Name<<"'s turn!"<<endl;
+    
+    //Begin Player 2 Turn
+    guess="0";       
+    cout<<endl;
+    cout<<"Here is your Guess Board, "<<gamDat.P2Name<<"!"<<endl;
+    cout<<endl;
+    cout<<endl;
+    DisBrd(gamDat.BrdDat.B2G,Z9);
+    cout<<"You have "<<gamDat.P2Pts<<" Points"<<endl;
+    cout<<endl;
+    cout<<endl;
+    cout<<gamDat.P2Name<<"; choose a Grid Square!"<<endl;
+    cin>>ValBuff; //Receive player input into Buffer, do not declare guess until validated
+    
+    //Begin Player 2 Input Validation Function
+    
+    IPVal (ValBuff); //Validation Function to Loop Player Input until within [A1,I9]
+    } //End Bypass Player 2 Input by AI
+    else
+    { //Begin AI Turn
+        AIL=0;AIN=0; //Reset Buffers for next ship
+        AIL=(rand()%9+1+64); //set random Char for column guess A-I A=65?
+        AIN=(rand()%9+1);   //set random Number for Row guess 1-9
+        ValBuff=(Cnvt(AIL))+to_string(AIN); //concatenate string for guess
+        cout<<"---------------------------"<<endl;
+        cout<<"The Computer has guessed "<<ValBuff<<endl;
+        cout<<"---------------------------"<<endl;
+    } //End AI Turn
+    guess=ValBuff; //Transfer buffer to actual guess
+    ValBuff="0"; //Clear buffer
+    //End Player 2 Input Validation Function
+    Shoot(guess,gamDat.BrdDat.B1S,Z9,gamDat.BrdDat.MB,gamDat.BrdDat.B2G,gamDat.P2Pts);
+    //Player 2 now has a valid guess
+    
+    //Begin Endgame Check 
+    if(gamDat.P2Pts>=17) //Are all Player 2 Ships off the board?
+    {Win=gamDat.P2Name; Turn=gamDat.turn;} //Set turns to max here to ensure game ends correctly, Declare Winner
+    //End Endgame Check
+    }
+    cout<<"---==Turn End==---"<<endl;
+    cout<<gamDat.P1Name<<" Points: "<<gamDat.P1Pts<<endl;
+    cout<<gamDat.P2Name<<" Points: "<<gamDat.P2Pts<<endl;
+    cout<<"------------------"<<endl;
+    }//End Turn Loop
+
+    //Declare Winner by Turns
+    if (gamDat.P1Pts<gamDat.P2Pts) //Check player points
+    {Win=gamDat.P2Name;}
+    else if (gamDat.P1Pts==gamDat.P2Pts) //Check if tie
+    {Win="Nobody";}
+    else {Win=gamDat.P1Name;} //Only other possible outcome
+
+    }//End Gameplay While Loop, put wrap up and score calculation below here
+    cout<<"x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x"<<endl;
+    cout<<endl;
+    cout<<endl;
+    cout<<endl;
+    cout<<"GAME OVER"<<endl;
+    cout<<gamDat.P1Name<<" has "<<gamDat.P1Pts<<" Points"<<endl;
+    cout<<gamDat.P2Name<<" has "<<gamDat.P2Pts<<" Points"<<endl;
+    cout<<Win<<" wins!"<<endl;
+    
+    //End Gameplay Display Text
+    
+    if(gamDat.P1Name==Win) //Set Winner/Loser points
+    {WinPts=gamDat.P1Pts; LosePts=gamDat.P2Pts;}
+    else{WinPts=gamDat.P2Pts;LosePts=gamDat.P1Pts;}
+    Scrs={}; //Default Scores Vector
+    file.open("Test1.txt", ios::in);  //reads text to Vector
+            
+                while(!file.eof()) //while data exists in file
+                {           
+
+                    record Plyr; //create buffer structure
+                    if(file >> Plyr.Name >> Plyr.Vs >> Plyr.Ps >> Plyr.Ts >> Plyr.Gs) //if all buffer slots are full
+                    {Scrs.push_back(Plyr);} //make room for a new record
+                    else
+                    {//reset noise           
+                        file.clear();
+                        file.ignore(100,'\n');
+                    }
+                    
+                }
+            file.close();
+    //Vector now loaded with text file data
+    
+    if(Scrs.size()<1)
+    {
+        record *Vctr = new record;  //create winner record
+        Vctr=newscre(Win,Win,WinPts,gamDat.turn);
+        Scrs.push_back(*Vctr);
+        delete Vctr;    
+        
+        string *buff = new string;
+        if(Win==gamDat.P1Name){*buff=gamDat.P2Name;}
+        else {*buff=gamDat.P1Name;}
+        
+        record *Lsr = new record;  //create loser record
+        Lsr=newscre(*buff,Win,LosePts,gamDat.turn);   
+        Scrs.push_back(*Lsr);
+        delete buff;
+        delete Lsr;
+    }   
+    else {
+        
+    bool *wrote = new bool;
+    *wrote=false;
+    for(int e=0;e<Scrs.size();e++)
+    {
+        
+        if(Scrs[e].Name==Win)
+        {
+            
+            updscre(Win,Win,WinPts,gamDat.turn,e,Scrs);
+            *wrote=true;
+        }
+        else if(e==(Scrs.size()-1) && Scrs[e].Name!=Win && *wrote!=true)
+        {
+        record *Vctr = new record;  //create winner record
+        Vctr=newscre(Win,Win,WinPts,gamDat.turn);
+        Scrs.push_back(*Vctr);
+        delete Vctr;
+        }
+        if(*wrote){e=Scrs.size();}
+    }        
+    
+    *wrote=false;
+    
+    string *buff = new string;
+    if(Win==gamDat.P1Name){*buff=gamDat.P2Name;}
+    else {*buff=gamDat.P1Name;}
+    
+    for(int e=0;e<Scrs.size();e++)
+    {
+        if(Scrs[e].Name==*buff)
+        {
+            updscre(*buff,Win,LosePts,gamDat.turn,e,Scrs);
+            *wrote=true;
+        }
+        else if(e==(Scrs.size()-1) && Scrs[e].Name!=*buff && *wrote!=true)
+        {
+            record *Lsr = new record;  //create loser record
+            Lsr=newscre(*buff,Win,LosePts,gamDat.turn);   
+            Scrs.push_back(*Lsr);
+            delete Lsr;
+        }
+        if(*wrote){e=Scrs.size();}
+    }        
+    delete buff;        
+    delete wrote;
+    }
+    
+    
+    
+        
+        
+        
+        
+        
+    file.open("Test1.txt",ios::out);  //Put Vector back into File
+           for(int k=0;k<Scrs.size();k++)
+           {
+               file << Scrs[k].Name<<"\t"<<Scrs[k].Vs<<"\t"<<Scrs[k].Ps<<"\t"<<Scrs[k].Ts<<"\t"<<Scrs[k].Gs<<"\n"; //tab-delineated so it can be dropped in excel
+            }
+        
+    
+    
+    
+    file.close();
+        Scrs={}; //Reset Vector       
+            
+    file.open("Test1.txt", ios::in);  //Re-Read Text File to Vector
+                while(!file.eof())
+                {
+                    record Plyr;
+                    if(file >> Plyr.Name >> Plyr.Vs >> Plyr.Ps >> Plyr.Ts >> Plyr.Gs)
+                    {Scrs.push_back(Plyr);}
+                    else{
+                        file.clear();
+                        file.ignore(100,'\n');
+                    }
+                }
+            file.close();
+        DisScre(Scrs); //display high scores after game
+return 0;
+}
+void IPVal (string &ValBuff)
+{//Start Input Validation check function
+    string ColChk; //Buffer to check column letter
+    int RowChk; //Buffer to check row number
+    
+    do
+    {//Begin do-while loop for human input - does not allow invalid inputs
+    ColChk=ValBuff.substr(0,1); //Set Column Buffer to letter input
+    stringstream Row(ValBuff.substr(1,1)); //Convert number in string to a (lovely) integer
+    Row>>RowChk; //Send Row string to RowChk integer
+    if (ValBuff.length()!=2 || ColChk>"I" || ColChk<"A" || RowChk>9 || RowChk<1) //Determines if within appropriate bounds
+    {cout<<"Input Invalid, please use one Capital Letter followed by one Number!"<<endl;cin>>ValBuff;}
+    }while (ValBuff.length()!=2 || ColChk>"I" || ColChk<"A" || RowChk>9 || RowChk<1); //Loops if not within appropriate bounds
+    
+}
+void IPVal (short &Len) //Just for the Overloading example, checks size of turns for board
+{
+    while(Len>(9*9)) //board is 9x9
+    {
+        cout<<"You will run out of guesses before then!"<<endl;
+        cout<<"Input Less Turns!"<<endl;
+        cin>>Len;
+    }
+}
+void FillShp (string a[],int SIZE, string user)
+{
+    string Letter;      //String Buffer
+    char* Buff, act;    //String to Char conversion assistants
+    int Num;    //Number Buffer
+    bool Flip;  //Gate for input validation
+    Flip=true;
+    Letter=a[0].substr(0,1);                //extract letter from guess
+    stringstream NumBuff(a[0].substr(1,1)); //extract number from guess
+    NumBuff>>Num;                           //fill Number buffer
+    
+    while (Flip)
+    {
+    if (user.compare("R")==0 || user.compare("r")==0 ||user.compare("L")==0 ||user.compare("l")==0 ||user.compare("U")==0 ||user.compare("u")==0 ||user.compare("D")==0 ||user.compare("d")==0 )
+    {Flip=false;    } //Ensures data is a valid selection
+    else {cout<<"Invalid Input Please use |L|  |R|  |U|  |D|"<<endl;cin>>user;}
+        //Ship Orientation Specifics
+    if(user=="R" || user=="r") 
+    {
+            if(Letter=="I"){cout<<"Your Selection goes Off the Board!  Please Use |L|, |U|, or |D|"<<endl;Flip=true; cin>>user; }
+            else if(Letter=="H"&&SIZE>2){cout<<"Your Selection goes Off the Board!  Please Use |L|, |U|, or |D|"<<endl;Flip=true; cin>>user; }
+            else if(Letter=="G"&&SIZE>3){cout<<"Your Selection goes Off the Board!  Please Use |L|, |U|, or |D|"<<endl;Flip=true; cin>>user; }
+            else if(Letter=="F"&&SIZE>4){cout<<"Your Selection goes Off the Board!  Please Use |L|, |U|, or |D|"<<endl;Flip=true; cin>>user; }
+        else
+        {
+        for (int i=1 ; i<SIZE ; i++)
+            {
+           Buff=const_cast<char*>(Letter.c_str()); //Allows Buff to embody pointer to Letter String
+           act=*Buff; //Converts the Char* pointer to an actual variable 
+           act++;
+          Letter=act;
+          a[i]=(Letter+to_string(Num));
+            }
+        }
+    }//End Right
+    else if (user=="U" || user=="u")
+    {
+            if(Num==1){cout<<"Your Selection goes Off the Board!  Please Use |R|, |L|, or |D|"<<endl;Flip=true; cin>>user; }
+            else if(Num==2&&SIZE>2){cout<<"Your Selection goes Off the Board!  Please Use |R|, |L|, or |D|"<<endl;Flip=true; cin>>user; }
+            else if(Num==3&&SIZE>3){cout<<"Your Selection goes Off the Board!  Please Use |R|, |L|, or |D|"<<endl;Flip=true; cin>>user; }
+            else if(Num==4&&SIZE>4){cout<<"Your Selection goes Off the Board!  Please Use |R|, |L|, or |D|"<<endl;Flip=true; cin>>user; }
+      else
+      {  
+        for (int i=1 ; i<SIZE ; i++)
+        {
+        Num--;
+        a[i]=(Letter+to_string(Num));
+        }
+      }
+    }//End Up
+    else if (user=="L" || user=="l")
+    {
+            if(Letter=="A"){cout<<"Your Selection goes Off the Board!  Please Use |R|, |U|, or |D|"<<endl;Flip=true; cin>>user; }
+            else if(Letter=="B"&&SIZE>2){cout<<"Your Selection goes Off the Board!  Please Use |R|, |U|, or |D|"<<endl;Flip=true; cin>>user; }
+            else if(Letter=="C"&&SIZE>3){cout<<"Your Selection goes Off the Board!  Please Use |R|, |U|, or |D|"<<endl;Flip=true; cin>>user; }
+            else if(Letter=="D"&&SIZE>4){cout<<"Your Selection goes Off the Board!  Please Use |R|, |U|, or |D|"<<endl;Flip=true; cin>>user; }
+      else
+      {
+        for (int i=1 ; i<SIZE ; i++)
+        {
+        Buff=const_cast<char*>(Letter.c_str());
+        act=*Buff;
+        act--;
+        Letter=act;
+        a[i]=(Letter+to_string(Num));
+        }
+      }
+    }//End Left
+    else if (user=="D" || user=="d")
+    {
+        if(Num==10){cout<<"Your Selection goes Off the Board!  Please Use |R|, |L|, or |U|"<<endl;Flip=true; cin>>user; }
+            else if(Num==9&&SIZE>2){cout<<"Your Selection goes Off the Board!  Please Use |R|, |L|, or |U|"<<endl;Flip=true; cin>>user; }
+            else if(Num==8&&SIZE>3){cout<<"Your Selection goes Off the Board!  Please Use |R|, |L|, or |U|"<<endl;Flip=true; cin>>user; }
+            else if(Num==7&&SIZE>4){cout<<"Your Selection goes Off the Board!  Please Use |R|, |L|, or |U|"<<endl;Flip=true; cin>>user; }
+      else
+      {
+        for (int i=1 ; i<SIZE ; i++)
+        {
+        Num++;
+        a[i]=(Letter+to_string(Num));
+        }  
+      }
+    }//end Down
+    else {cout<<"You are trying to enter a Grid Square instead of a Direction"<<endl;
+    cout<<"Use |L|  |R|  |U|  |D|"<<endl;}
+    }//end While Loop
+}
+bool Clip2 (string a[],int SIZEA,string b[],int SIZEB,string &ValBuff)
+{//Compares two arrays for any overlap
+    for (int i=0 ; i<SIZEA ; i++)
+    {
+        for(int j=0 ; j<SIZEB ; j++)
+        {
+            if(a[i]==b[j])
+            {ValBuff=a[i];return(true);}
+        }
+    }
+    return(false);
+}
+void ICoord (string *a,int SIZE)
+{//outputs individual ship coordinates
+    cout<<"| ";
+    for (int i=0 ; i<SIZE ; i++)
+    {
+        cout<<a[i]<<" | ";
+    }
+    cout<<endl;
+}
+void UpdSBrd (string *a,int aSIZE,string b[][9],int bSIZE,string m[][9]) //updates ship boards
+{
+    for(int i=0 ; i<aSIZE ; i++)
+    {
+    for(int q=0 ; q<bSIZE; q++)
+    {
+        for(int w=0 ; w<bSIZE; w++)
+        {
+            if(a[i]==m[w][q])
+            {
+                b[w][q]="||";
+            }
+        }
+    }
+    }
+}
+void UpdGBrd (string user,string b[][9],int bSIZE,string m[][9],bool hit) //updates guess boards
+{
+    for(int i=0 ; i<bSIZE ; i++)
+    {
+        for(int q=0 ; q<bSIZE; q++)
+        {
+            if(m[i][q]==user)
+            {
+                if(hit==true)
+                {b[i][q]="XX";}
+                else
+                { b[i][q]="OO";}
+            }
+        }
+    }
+}
+void MBdFill (string b[][9],int SIZE)
+{//Fills Master Board with Grid Locations
+    string Letter;
+    char* Buff, act;
+    int Num;
+    Num=1;
+    Letter="A"; //grid starts with this letter
+    for(int q=0 ; q<SIZE; q++)
+    {    
+
+        for(int w=0 ; w<SIZE; w++)
+        {
+            
+            b[w][q]=(Letter+to_string(Num));
+            
+            
+            Buff=const_cast<char*>(Letter.c_str()); //Allows Buff to embody pointer to Letter String
+            act=*Buff; //Converts the Char* pointer to an actual variable 
+            act++; //Adds one to Char, sending it down alphabetically
+            Letter=act;
+        }
+        Num++;      //next row numbers
+        Letter="A"; //reset columns for next row
+    }
+}
+void DisBrd (string b[][9],int SIZE)
+{//Displays any board with nice formatting
+    cout<<"    A  B  C  D  E  F  G  H  I"<<endl;
+    cout<<"    -------------------------"<<endl;
+    for(int q=0 ; q<SIZE; q++)
+    {
+        cout<<q+1<<" | ";
+        for(int w=0 ; w<SIZE; w++)
+        {cout<<b[w][q]<<" ";}
+        cout<<endl;
+    }
+    cout<<"    -------------------------"<<endl;
+}
+void BBdFill (string b[][9],int bSIZE)
+{//Fills a player board with waves - it's the ocean!
+    for(int q=0 ; q<bSIZE; q++)
+    {
+        for(int w=0 ; w<bSIZE; w++)
+        {
+          b[w][q]="~~"; //Ride on those waves!
+        }
+        
+    }
+}
+void Shoot (string user,string b[][9],int bSIZE,string m[][9],string g[][9],short &pts)
+{
+    bool hit; //input for updating guess boards with X's or O's
+    for(int i=0 ; i<bSIZE ; i++)
+    {
+    for(int q=0 ; q<bSIZE; q++)
+    {
+        if(m[i][q]==user)
+        {
+            if(b[i][q]=="||")
+            {
+                b[i][q]="XX";
+                pts++;
+                hit=true;
+                cout<<endl;
+                cout<<"++++++"<<endl;
+                cout<<"+Hit!+"<<endl;
+                cout<<"++++++"<<endl;
+            }
+            else
+            {   
+                cout<<endl;
+                cout<<"-------"<<endl;
+                cout<<"-Miss!-"<<endl;
+                cout<<"-------"<<endl;
+                hit=false;
+            }
+        }
+    }
+    }
+    UpdGBrd (user,g,bSIZE,m,hit); //update guess board for player
+}
+void DisScre(vector<record> &Scrs)
+{//Displays Vector contents
+    record disp;
+    cout<<"Name"<<"\t"<<"W/L"<<"\t"<<"Pts"<<"\t"<<"Turns"<<"\t"<<"Games"<<endl;
+            for(int h=0;h<(Scrs.size());h++)
+            {
+                cout<<Scrs[h].Name<<"\t"<<Scrs[h].Vs<<"\t"<<Scrs[h].Ps<<"\t"<<Scrs[h].Ts<<"\t"<<Scrs[h].Gs<<endl;
+            }
+}
+string Cnvt (char rec)
+{//Converts char to string - for grading purposes only ("return" a variable)
+    string Buff;
+    Buff=rec;
+    return Buff;
+}
+record *newscre (string name,string Win,int Pts,int Len)
+{
+    record *temp=new record;
+    if(name==Win)
+    {   
+          //create winner record
+            (*temp).Name=Win;
+            (*temp).Vs=1;
+            (*temp).Ps=Pts;
+            (*temp).Ts=Len;
+            (*temp).Gs=1;
+    }
+    else
+    {
+          //create loser record
+            (*temp).Name=name;
+            (*temp).Vs=0;
+            (*temp).Ps=Pts;
+            (*temp).Ts=Len;
+            (*temp).Gs=1;
+    }
+        
+    return temp;
+}
+void updscre (string name,string Win,int Pts,int Len,int e,vector<record> &temp)
+{
+    if(name==Win)
+    {   
+          //update winner record
+            temp[e].Vs++;
+            temp[e].Ps+=Pts;
+            temp[e].Ts+=Len;
+            temp[e].Gs++;
+    }
+    else
+    {
+          //update loser record
+            temp[e].Ps+=Pts;
+            temp[e].Ts+=Len;
+            temp[e].Gs++;
+    }
+        
+}
+void saveG (plyrSave savDat,fstream file)
+{
+    
+}
+void shptxt (int x)
+{
+    if(x==0){cout<<"-=DESTROYER - TWO SPACES=-"<<endl;}
+    else if(x==1){cout<<"-=CRUISER - THREE SPACES=-"<<endl;}
+    else if(x==2){cout<<"-=SUBMARINE - THREE SPACES=-"<<endl;}
+    else if(x==3){cout<<"-=BATTLECRUISER - FOUR SPACES=-"<<endl;}
+    else if(x==4){cout<<"-=CARRIER - FIVE SPACES=-"<<endl;}
+    }
+bool Clip3 (shipDat *PShips,short ShpDZ,string ValBuff)
+{
+        for(int w=1;w<ShpDZ;w++)
+        {
+            if(Clip2(PShips[w-1].spcs,PShips[w-1].size,PShips[w].spcs,PShips[w].size,ValBuff)){return true;}
+        }
+        return false;
+}
+//Changelog
+//v3.1:
+//Added new structure element "Games", allowed file to update existing player records,
+//fixed player record creation issues from original version, embedded text file
+//operations in functions for both winner and loser records
+//v3.2:
+//Added structures for boards and player save data.  Intend to create a binary file 
+//to read the structure for save data so players can resume their game and demonstrate
+//the use of placing structure into binary files and retrieving them.  Create a function
+//skeleton for saveG for converting data into the structure
+//v3.3:
+//Converted the entire main into structure-based language, placed text formatting and
+//loops to make player data input into individual sections instead of code for each ship
+//individually.  Experimental data validation function for AI ship setup in place.
+//v3.4:
+//Diagnostic testing version to dial in player clipping validation and ship setup.  Game
+//now runs but has many errors during player ship set up and AI ship set up.  Actual 
+//gameplay after set up should remain the same, just need to fix loops
